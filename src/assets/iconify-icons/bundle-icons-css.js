@@ -1,15 +1,3 @@
-/**
- * This is an advanced example for creating icon bundles for Iconify SVG Framework.
- *
- * It creates a bundle from:
- * - All SVG files in a directory.
- * - Custom JSON files.
- * - Iconify icon sets.
- * - SVG framework.
- *
- * This example uses Iconify Tools to import and clean up icons.
- * For Iconify Tools documentation visit https://docs.iconify.design/tools/tools2/
- */
 import { promises as fs } from 'node:fs'
 import { dirname, join } from 'node:path'
 
@@ -17,26 +5,27 @@ import { dirname, join } from 'node:path'
 import { cleanupSVG, importDirectory, isEmptyColor, parseColors, runSVGO } from '@iconify/tools'
 import { getIcons, getIconsCSS, stringToIcon } from '@iconify/utils'
 
-// Importing JSON files with dynamic import since require is not supported in ES modules
-const jsonFiles = {
-  ri: import('@iconify/json/json/ri.json'),
-  lineMd: import('@iconify/json/json/line-md.json'),
-}
-
-// Convert the imported JSON files to a promise array
 const sources = {
   json: [
-    jsonFiles.ri,
+    // Iconify JSON file (@iconify/json is a package name, /json/ is directory where files are, then filename)
+    require.resolve('@iconify/json/json/ri.json'),
+
+    // Custom file with only few icons
     {
-      filename: jsonFiles.lineMd,
+      filename: require.resolve('@iconify/json/json/line-md.json'),
       icons: ['home-twotone-alt', 'github', 'document-list', 'document-code', 'image-twotone']
     }
+
+    // Custom JSON file
+    // 'json/gg.json'
   ],
   icons: [
     'bx-basket',
     'bi-airplane-engines',
     'tabler-anchor',
     'uit-adobe-alt',
+
+    // 'fa6-regular-comment',
     'twemoji-auto-rickshaw'
   ],
   svg: [
@@ -53,8 +42,8 @@ const sources = {
   ]
 }
 
-// File to save bundle to
-const target = join(__dirname, 'generated-icons.css')
+// Fix for ES modules: Use import.meta.url instead of __dirname
+const target = join(new URL(import.meta.url).pathname, 'generated-icons.css')
 
 ;(async function () {
   // Create directory for output if missing
@@ -65,7 +54,7 @@ const target = join(__dirname, 'generated-icons.css')
       recursive: true
     })
   } catch (err) {
-    //
+    // Directory creation failed (ignore)
   }
 
   const allIcons = []
@@ -80,7 +69,7 @@ const target = join(__dirname, 'generated-icons.css')
     const organizedList = organizeIconsList(sources.icons)
 
     for (const prefix in organizedList) {
-      const filename = await jsonFiles[prefix]?.default // Dynamic import for JSON files
+      const filename = require.resolve(`@iconify/json/json/${prefix}.json`)
 
       sourcesJSON.push({
         filename,
@@ -98,12 +87,11 @@ const target = join(__dirname, 'generated-icons.css')
 
       // Load icon set
       const filename = typeof item === 'string' ? item : item.filename
-      const content = await filename // Await dynamic import result
-      const iconsContent = await content
+      const content = JSON.parse(await fs.readFile(filename, 'utf8'))
 
       // Filter icons
       if (typeof item !== 'string' && item.icons?.length) {
-        const filteredContent = getIcons(iconsContent, item.icons)
+        const filteredContent = getIcons(content, item.icons)
 
         if (!filteredContent) throw new Error(`Cannot find required icons in ${filename}`)
 
@@ -111,7 +99,7 @@ const target = join(__dirname, 'generated-icons.css')
         allIcons.push(filteredContent)
       } else {
         // Collect all icons from the JSON file
-        allIcons.push(iconsContent)
+        allIcons.push(content)
       }
     }
   }

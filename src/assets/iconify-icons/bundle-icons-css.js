@@ -17,27 +17,26 @@ import { dirname, join } from 'node:path'
 import { cleanupSVG, importDirectory, isEmptyColor, parseColors, runSVGO } from '@iconify/tools'
 import { getIcons, getIconsCSS, stringToIcon } from '@iconify/utils'
 
+// Importing JSON files with dynamic import since require is not supported in ES modules
+const jsonFiles = {
+  ri: import('@iconify/json/json/ri.json'),
+  lineMd: import('@iconify/json/json/line-md.json'),
+}
+
+// Convert the imported JSON files to a promise array
 const sources = {
   json: [
-    // Iconify JSON file (@iconify/json is a package name, /json/ is directory where files are, then filename)
-    require.resolve('@iconify/json/json/ri.json'),
-
-    // Custom file with only few icons
+    jsonFiles.ri,
     {
-      filename: require.resolve('@iconify/json/json/line-md.json'),
+      filename: jsonFiles.lineMd,
       icons: ['home-twotone-alt', 'github', 'document-list', 'document-code', 'image-twotone']
     }
-
-    // Custom JSON file
-    // 'json/gg.json'
   ],
   icons: [
     'bx-basket',
     'bi-airplane-engines',
     'tabler-anchor',
     'uit-adobe-alt',
-
-    // 'fa6-regular-comment',
     'twemoji-auto-rickshaw'
   ],
   svg: [
@@ -81,7 +80,7 @@ const target = join(__dirname, 'generated-icons.css')
     const organizedList = organizeIconsList(sources.icons)
 
     for (const prefix in organizedList) {
-      const filename = require.resolve(`@iconify/json/json/${prefix}.json`)
+      const filename = await jsonFiles[prefix]?.default // Dynamic import for JSON files
 
       sourcesJSON.push({
         filename,
@@ -99,11 +98,12 @@ const target = join(__dirname, 'generated-icons.css')
 
       // Load icon set
       const filename = typeof item === 'string' ? item : item.filename
-      const content = JSON.parse(await fs.readFile(filename, 'utf8'))
+      const content = await filename // Await dynamic import result
+      const iconsContent = await content
 
       // Filter icons
       if (typeof item !== 'string' && item.icons?.length) {
-        const filteredContent = getIcons(content, item.icons)
+        const filteredContent = getIcons(iconsContent, item.icons)
 
         if (!filteredContent) throw new Error(`Cannot find required icons in ${filename}`)
 
@@ -111,7 +111,7 @@ const target = join(__dirname, 'generated-icons.css')
         allIcons.push(filteredContent)
       } else {
         // Collect all icons from the JSON file
-        allIcons.push(content)
+        allIcons.push(iconsContent)
       }
     }
   }
